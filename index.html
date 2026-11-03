@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Твоя История</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=Press+Start+2P&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --accent: #f0f0f5;
+      --accent-dark: #888892;
+      --accent-glow: rgba(255, 255, 255, 0.15);
+      --glass-bg: rgba(8, 8, 10, 0.9);
+      --glass-border: rgba(255, 255, 255, 0.08);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100dvh;
+      background-color: #000000;
+      color: #f0f0f5;
+      font-family: 'Montserrat', sans-serif;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* Фоновые эффекты и минималистичные частицы */
+    #particles-canvas {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    .ambient-glow {
+      position: fixed;
+      inset: 0;
+      background:
+        radial-gradient(circle at 50% 50%, rgba(20, 20, 25, 0.4) 0%, rgba(0, 0, 0, 0.98) 80%);
+      z-index: 1;
+      pointer-events: none;
+    }
+
+    /* Верхняя полоса прогресса истории */
+    .story-progress {
+      position: fixed;
+      top: 14px;
+      left: 20px;
+      right: 20px;
+      z-index: 45;
+      display: grid;
+      grid-template-columns: repeat(10, 1fr);
+      gap: 6px;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.4s ease, visibility 0.4s ease;
+      pointer-events: none;
+    }
+
+    .story-progress.visible {
+      opacity: 1;
+      visibility: visible;
+    }
+
+    .progress-segment {
+      height: 2px;
+      border-radius: 2px;
+      background: rgba(255, 255, 255, 0.08);
+      overflow: hidden;
+      position: relative;
+    }
+
+    .progress-segment::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: #f0f0f5;
+      transform: scaleX(0);
+      transform-origin: left;
+      transition: transform 0.35s ease;
+    }
+
+    .progress-segment.active::after,
+    .progress-segment.completed::after {
+      transform: scaleX(1);
+    }
+
+    /* Экраны */
+    .screen {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+      transition: opacity 0.5s cubic-bezier(0.22, 1, 0.36, 1), visibility 0.5s ease;
+      padding: 20px;
+      z-index: 10;
+    }
+
+    .screen.active {
+      opacity: 1;
+      visibility: visible;
+      pointer-events: auto;
+    }
+
+    /* Музыкальный виджет */
+    .music-widget {
+      position: fixed;
+      top: 26px;
+      right: 20px;
+      z-index: 50;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 14px;
+      border-radius: 20px;
+      background: var(--glass-bg);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      color: #f0f0f5;
+      cursor: pointer;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.4s ease, transform 0.2s ease, border-color 0.2s ease;
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      max-width: calc(100vw - 40px);
+    }
+
+    .music-widget.visible {
+      opacity: 1;
+      visibility: visible;
+    }
+
+    .music-widget:hover {
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+
+    .eq-bars {
+      display: flex;
+      align-items: flex-end;
+      gap: 2px;
+      height: 12px;
+      width: 12px;
+      flex-shrink: 0;
+    }
+
+    .eq-bar {
+      width: 2.5px;
+      background-color: #f0f0f5;
+      border-radius: 1px;
+      animation: eqBounce 0.8s infinite ease-in-out alternate;
+    }
+
+    .eq-bar:nth-child(1) { height: 50%; animation-delay: 0s; }
+    .eq-bar:nth-child(2) { height: 100%; animation-delay: 0.2s; }
+    .eq-bar:nth-child(3) { height: 30%; animation-delay: 0.4s; }
+
+    .music-widget.muted .eq-bar {
+      animation: none;
+      height: 2px;
+      background-color: #55555c;
+    }
+
+    @keyframes eqBounce {
+      0% { height: 20%; }
+      100% { height: 100%; }
+    }
+
+    .track-title {
+      font-size: 0.75rem;
+      font-weight: 500;
+      color: rgba(255, 255, 255, 0.7);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .sound-icon {
+      font-size: 0.85rem;
+      line-height: 1;
+      flex-shrink: 0;
+    }
+
+    /* 1. Главный экран */
+    .hero-card {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      gap: 24px;
+      padding: 40px 30px;
+      border-radius: 20px;
+      background: #050507;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      max-width: 480px;
+      width: 90vw;
+    }
+
+    .hero-badge {
+      display: none;
+    }
+
+    .hero-title {
+      font-size: clamp(1.5rem, 4vw, 2.2rem);
+      font-weight: 700;
+      line-height: 1.2;
+      color: #f0f0f5;
+      letter-spacing: -0.3px;
+    }
+
+    .start-btn {
+      position: relative;
+      background: #f0f0f5;
+      color: #050507;
+      border: none;
+      padding: 16px 32px;
+      font-size: clamp(0.95rem, 2vw, 1.1rem);
+      font-weight: 600;
+      font-family: inherit;
+      border-radius: 25px;
+      cursor: pointer;
+      text-align: center;
+      width: 100%;
+      transition: background 0.2s ease, transform 0.2s ease;
+    }
+
+    .start-btn:hover {
+      background: #ffffff;
+      transform: scale(1.02);
+    }
+
+    .start-btn:active {
+      transform: scale(0.98);
+    }
+
+    /* 2. Экран истории */
+    .story-content {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .image-container {
+      width: calc(100vw - 48px);
+      height: calc(100dvh - 100px);
+      margin-top: 10px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      z-index: 2;
+      transition: opacity 0.3s ease, transform 0.3s ease;
+    }
+
+    .image-container.fade-out {
+      opacity: 0;
+      transform: scale(0.96);
+    }
+
+    .photo-frame {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      max-width: 100%;
+      max-height: 100%;
+      border-radius: 12px;
+      padding: 4px;
+      background: #08080a;
+      border: 1px solid rgba(255, 255, 255, 0.04);
+    }
+
+    .story-img {
+      max-width: calc(100vw - 56px);
+      max-height: calc(100dvh - 120px);
+      width: auto;
+      height: auto;
+      object-fit: contain;
+      border-radius: 8px;
+      display: block;
+      background-color: #000000;
+    }
+
+    .story-img.rotated-270 {
+      transform: rotate(270deg);
+      max-width: calc(100dvh - 130px);
+      max-height: calc(100vw - 56px);
+    }
+
+    .slide-counter {
+      position: fixed;
+      bottom: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 4px 12px;
+      border-radius: 12px;
+      background: rgba(8, 8, 10, 0.8);
+      font-size: 0.75rem;
+      font-weight: 500;
+      color: rgba(255, 255, 255, 0.5);
+      letter-spacing: 2px;
+      z-index: 25;
+      pointer-events: none;
+    }
+
+    /* Кнопка "Далее" */
+    .next-btn {
+      position: fixed;
+      z-index: 30;
+      background: rgba(20, 20, 25, 0.9);
+      color: #f0f0f5;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      padding: 12px 24px;
+      font-size: clamp(0.85rem, 1.8vw, 1rem);
+      font-weight: 500;
+      font-family: inherit;
+      border-radius: 20px;
+      cursor: pointer;
+      white-space: nowrap;
+      backdrop-filter: blur(8px);
+      transition:
+        left 0.3s cubic-bezier(0.22, 1, 0.36, 1),
+        top 0.3s cubic-bezier(0.22, 1, 0.36, 1),
+        opacity 0.2s ease,
+        background 0.2s ease,
+        border-color 0.2s ease;
+    }
+
+    .next-btn:hover {
+      background: rgba(35, 35, 42, 0.95);
+      border-color: rgba(255, 255, 255, 0.25);
+    }
+
+    .next-btn:active {
+      transform: scale(0.97);
+    }
+
+    .next-btn.fade-out {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    /* 3. Финальный экран */
+    .end-card {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 24px;
+      text-align: center;
+    }
+
+    .game-over-text {
+      font-family: 'Press Start 2P', monospace;
+      font-size: clamp(1.6rem, 5vw, 3.5rem);
+      color: #f0f0f5;
+      text-align: center;
+      letter-spacing: 3px;
+      line-height: 1.2;
+    }
+
+    .end-subtitle {
+      font-size: clamp(0.85rem, 1.8vw, 1rem);
+      color: rgba(255, 255, 255, 0.4);
+      font-weight: 400;
+    }
+
+    .restart-btn {
+      background: transparent;
+      color: rgba(255, 255, 255, 0.7);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      padding: 12px 26px;
+      font-size: 0.9rem;
+      font-weight: 500;
+      font-family: inherit;
+      border-radius: 20px;
+      cursor: pointer;
+      transition: color 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+    }
+
+    .restart-btn:hover {
+      color: #ffffff;
+      border-color: rgba(255, 255, 255, 0.4);
+      background: rgba(255, 255, 255, 0.03);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Минималистичный фон -->
+  <canvas id="particles-canvas"></canvas>
+  <div class="ambient-glow"></div>
+
+  <!-- Аудио плеер -->
+  <audio id="bg-music" src="Франсе (instrumental) - Voskresenskii.mp3" loop preload="auto"></audio>
+
+  <!-- Полоса прогресса слайдов -->
+  <div id="story-progress" class="story-progress"></div>
+
+  <!-- Виджет трека -->
+  <button id="music-widget" class="music-widget" title="Включить / выключить звук">
+    <div class="eq-bars">
+      <span class="eq-bar"></span>
+      <span class="eq-bar"></span>
+      <span class="eq-bar"></span>
+    </div>
+    <span class="track-title">Voskresenskii — Франсе (instrumental)</span>
+    <span id="sound-icon" class="sound-icon">🔊</span>
+  </button>
+
+  <!-- 1. Главный экран -->
+  <section id="title-screen" class="screen active">
+    <div class="hero-card">
+      <h1 class="hero-title">Готов?</h1>
+      <button id="start-btn" class="start-btn">
+        Начать
+      </button>
+    </div>
+  </section>
+
+  <!-- 2. Экран истории -->
+  <section id="story-screen" class="screen">
+    <div class="story-content">
+      <div id="image-container" class="image-container">
+        <div id="photo-frame" class="photo-frame">
+          <img id="story-img" class="story-img" src="photo1.jpg" alt="История">
+        </div>
+      </div>
+      <div id="slide-counter" class="slide-counter">1 / 10</div>
+      <button id="next-btn" class="next-btn">Далее &#8594;</button>
+    </div>
+  </section>
+
+  <!-- 3. Финальный экран -->
+  <section id="end-screen" class="screen">
+    <div class="end-card">
+      <h1 class="game-over-text">Game Over</h1>
+      <p class="end-subtitle"></p>
+      <button id="restart-btn" class="restart-btn">&#8635; Заново</button>
+    </div>
+  </section>
+
+  <script>
+    const photos = [
+      'photo1.jpg', 'photo2.jpg', 'photo3.jpg', 'photo4.jpg', 'photo5.jpg',
+      'photo6.jpg', 'photo7.jpg', 'photo8.jpg', 'photo9.jpg', 'photo10.jpg'
+    ];
+
+    let currentSlide = 0;
+    let lastZoneIndex = -1;
+    let isTransitioning = false;
+
+    const titleScreen = document.getElementById('title-screen');
+    const storyScreen = document.getElementById('story-screen');
+    const endScreen = document.getElementById('end-screen');
+    const startBtn = document.getElementById('start-btn');
+    const nextBtn = document.getElementById('next-btn');
+    const restartBtn = document.getElementById('restart-btn');
+    const imageContainer = document.getElementById('image-container');
+    const photoFrame = document.getElementById('photo-frame');
+    const storyImg = document.getElementById('story-img');
+    const slideCounter = document.getElementById('slide-counter');
+    const storyProgress = document.getElementById('story-progress');
+    const bgMusic = document.getElementById('bg-music');
+    const musicWidget = document.getElementById('music-widget');
+    const soundIcon = document.getElementById('sound-icon');
+
+    bgMusic.volume = 0.6;
+
+    photos.forEach((_, idx) => {
+      const seg = document.createElement('div');
+      seg.className = 'progress-segment';
+      seg.dataset.index = idx;
+      storyProgress.appendChild(seg);
+    });
+
+    function updateProgressBar(index) {
+      const segments = storyProgress.querySelectorAll('.progress-segment');
+      segments.forEach((seg, i) => {
+        seg.classList.toggle('completed', i < index);
+        seg.classList.toggle('active', i === index);
+      });
+    }
+
+    photos.forEach(src => {
+      const img = new Image();
+      img.src = src;
+    });
+
+    musicWidget.addEventListener('click', () => {
+      bgMusic.muted = !bgMusic.muted;
+      musicWidget.classList.toggle('muted', bgMusic.muted);
+      soundIcon.textContent = bgMusic.muted ? '🔇' : '🔊';
+    });
+
+    storyImg.addEventListener('error', function () {
+      const fileName = photos[currentSlide] || 'photo.jpg';
+      const svgPlaceholder = `<svg xmlns="http://www.w3.org/2000/svg" width="640" height="460" viewBox="0 0 640 460">
+        <defs>
+          <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#08080a"/>
+            <stop offset="100%" stop-color="#000000"/>
+          </linearGradient>
+        </defs>
+        <rect width="100%" height="100%" fill="url(#bg)" stroke="#18181f" stroke-width="2" rx="12"/>
+        <circle cx="320" cy="185" r="32" fill="rgba(255, 255, 255, 0.03)" stroke="#55555c" stroke-width="1.5"/>
+        <text x="50%" y="193" fill="#888892" font-family="Montserrat, sans-serif" font-size="20" font-weight="500" text-anchor="middle">📷</text>
+        <text x="50%" y="265" fill="#f0f0f5" font-family="Montserrat, sans-serif" font-size="22" font-weight="600" text-anchor="middle">${fileName}</text>
+        <text x="50%" y="300" fill="#66666e" font-family="Montserrat, sans-serif" font-size="13" text-anchor="middle">Файл не найден</text>
+      </svg>`;
+      this.src = 'data:image/svg+xml;utf8,' + encodeURIComponent(svgPlaceholder);
+    });
+
+    function randomBetween(min, max) {
+      return Math.floor(Math.random() * (max - min + 1)) + min;
+    }
+
+    function moveNextButtonRandomly() {
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      const frameRect = photoFrame.getBoundingClientRect();
+      const btnRect = nextBtn.getBoundingClientRect();
+
+      const btnW = btnRect.width || 120;
+      const btnH = btnRect.height || 44;
+      const edgePad = 20;
+      const topSafePad = 75;
+      const bottomSafePad = 60;
+      const imgPad = 16;
+
+      const outerZones = [
+        { minX: edgePad, maxX: vw - btnW - edgePad, minY: topSafePad, maxY: frameRect.top - btnH - imgPad },
+        { minX: edgePad, maxX: vw - btnW - edgePad, minY: frameRect.bottom + imgPad, maxY: vh - btnH - bottomSafePad },
+        { minX: edgePad, maxX: frameRect.left - btnW - imgPad, minY: topSafePad, maxY: vh - btnH - bottomSafePad },
+        { minX: frameRect.right + imgPad, maxX: vw - btnW - edgePad, minY: topSafePad, maxY: vh - btnH - bottomSafePad }
+      ];
+
+      let validZones = outerZones
+        .map((zone, index) => ({ ...zone, index }))
+        .filter(z => z.maxX >= z.minX && z.maxY >= z.minY);
+
+      if (validZones.length === 0) {
+        const safeMaxX = Math.max(edgePad, vw - btnW - edgePad);
+        const safeMaxY = Math.max(topSafePad, vh - btnH - bottomSafePad);
+
+        validZones = [
+          { index: 0, minX: edgePad, maxX: Math.min(safeMaxX, edgePad + 80), minY: topSafePad, maxY: Math.min(safeMaxY, topSafePad + 60) },
+          { index: 1, minX: Math.max(edgePad, safeMaxX - 80), maxX: safeMaxX, minY: topSafePad, maxY: Math.min(safeMaxY, topSafePad + 60) },
+          { index: 2, minX: edgePad, maxX: Math.min(safeMaxX, edgePad + 80), minY: Math.max(topSafePad, safeMaxY - 60), maxY: safeMaxY },
+          { index: 3, minX: Math.max(edgePad, safeMaxX - 80), maxX: safeMaxX, minY: Math.max(topSafePad, safeMaxY - 60), maxY: safeMaxY }
+        ];
+      }
+
+      let pool = validZones.filter(z => z.index !== lastZoneIndex);
+      if (pool.length === 0) pool = validZones;
+
+      const chosenZone = pool[Math.floor(Math.random() * pool.length)];
+      lastZoneIndex = chosenZone.index;
+
+      const randomX = randomBetween(chosenZone.minX, chosenZone.maxX);
+      const randomY = randomBetween(chosenZone.minY, chosenZone.maxY);
+
+      nextBtn.style.left = `${randomX}px`;
+      nextBtn.style.top = `${randomY}px`;
+    }
+
+    function loadSlide(index) {
+      storyImg.classList.toggle('rotated-270', index === 5);
+
+      storyImg.onload = () => {
+        moveNextButtonRandomly();
+      };
+
+      storyImg.src = photos[index];
+      slideCounter.textContent = `${index + 1} / ${photos.length}`;
+      updateProgressBar(index);
+      moveNextButtonRandomly();
+    }
+
+    startBtn.addEventListener('click', () => {
+      bgMusic.play().catch(err => console.warn('Аудио заблокировано браузером:', err));
+      musicWidget.classList.add('visible');
+      storyProgress.classList.add('visible');
+
+      titleScreen.classList.remove('active');
+      storyScreen.classList.add('active');
+      currentSlide = 0;
+      loadSlide(currentSlide);
+    });
+
+    nextBtn.addEventListener('click', () => {
+      if (isTransitioning) return;
+      isTransitioning = true;
+
+      if (currentSlide >= photos.length - 1) {
+        storyScreen.classList.remove('active');
+        storyProgress.classList.remove('visible');
+        endScreen.classList.add('active');
+        isTransitioning = false;
+        return;
+      }
+
+      imageContainer.classList.add('fade-out');
+      nextBtn.classList.add('fade-out');
+
+      setTimeout(() => {
+        currentSlide++;
+        loadSlide(currentSlide);
+
+        requestAnimationFrame(() => {
+          imageContainer.classList.remove('fade-out');
+          nextBtn.classList.remove('fade-out');
+          isTransitioning = false;
+        });
+      }, 300);
+    });
+
+    restartBtn.addEventListener('click', () => {
+      endScreen.classList.remove('active');
+      storyScreen.classList.add('active');
+      storyProgress.classList.add('visible');
+      currentSlide = 0;
+      loadSlide(currentSlide);
+    });
+
+    window.addEventListener('resize', () => {
+      if (storyScreen.classList.contains('active')) {
+        moveNextButtonRandomly();
+      }
+    });
+
+    // Спокойные, едва заметные точки на фоне
+    const canvas = document.getElementById('particles-canvas');
+    const ctx = canvas.getContext('2d');
+    let particles = [];
+
+    function resizeCanvas() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    }
+
+    function initParticles() {
+      resizeCanvas();
+      particles = Array.from({ length: 25 }, () => ({
+        x: Math.random() * canvas.width,
+        y: Math.random() * canvas.height,
+        radius: Math.random() * 1.5 + 0.4,
+        speedY: -(Math.random() * 0.2 + 0.05),
+        speedX: (Math.random() - 0.5) * 0.1,
+        alpha: Math.random() * 0.25 + 0.05
+      }));
+    }
+
+    function animateParticles() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      for (const p of particles) {
+        p.x += p.speedX;
+        p.y += p.speedY;
+
+        if (p.y < -10) {
+          p.y = canvas.height + 10;
+          p.x = Math.random() * canvas.width;
+        }
+        if (p.x < -10) p.x = canvas.width + 10;
+        if (p.x > canvas.width + 10) p.x = -10;
+
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(255, 255, 255, ${p.alpha})`;
+        ctx.fill();
+      }
+      requestAnimationFrame(animateParticles);
+    }
+
+    window.addEventListener('resize', resizeCanvas);
+    initParticles();
+    animateParticles();
+  </script>
+</body>
+</html>
